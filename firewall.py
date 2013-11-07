@@ -59,7 +59,7 @@ class Firewall:
         #print pkt_dir
         #print len(pkt[0:4])
         #print "%d"%(pkt[0:4])
-        print pkt
+        #print pkt
 
         l = struct.unpack('!H', pkt[2:4])
         if len(pkt) != l[0]:
@@ -118,10 +118,11 @@ class Firewall:
     def handle_UDP(self, extIP, port):
         drop = False
         for rule in self.rules["udp"]:
-            print rule
-            ccn = self.binary_search_tree_searching_for_geoidbp(extIP, self.geoipdb)
-            print ccn
-            if rule[2] == extIP or rule[2] == 'any':
+            #print rule
+            IP = self.ip_conv(extIP)
+            ccn = self.geo_search(IP, self.geoipdb)
+           # print ccn
+            if rule[2] == IP or rule[2] == 'any':
                 if rule[0] == 'drop': 
                     drop = True
                     print "gonna drop 1"
@@ -139,8 +140,11 @@ class Firewall:
     def handle_TCP(self, extIP, port):
         drop = False
         for rule in self.rules["tcp"]:
-            print rule
-            if rule[2] == extIP or rule[2] == 'any':
+            #print rule
+            IP = self.ip_conv(extIP)
+            ccn = self.geo_search(extIP, self.geoipdb)
+            #print ccn
+            if rule[2] == IP or rule[2] == 'any':
                 if rule[0] == 'drop': 
                     drop = True
                     print "gonna drop 1"
@@ -152,21 +156,43 @@ class Firewall:
                     print "gonna drop 2"
                 else:
                     drop = False
-        print drop
+        #print drop
     
-    def binary_search_tree_searching_for_geoidbp(self, ip, geo):
-        print ip
+    def geo_search(self, ip, geo):
+       # print ip
+        if len(geo) <= 1:
+            print "failed"
+            print "failed"
+            return "failed"
         if(geo[len(geo)/2][0] <= ip and geo[len(geo)/2][1] >= ip):
+            print ip
+            print "found", geo[len(geo)][2]
             return geo[len(geo)][2]
         elif geo[len(geo)/2][0] > ip:
-            print "left"
-            return self.binary_search_tree_searching_for_geoidbp(ip,geo[0:len(geo)/2])
+            #print "left"
+            print geo[len(geo)/2][0],'>', ip
+            return self.geo_search(ip,geo[0:len(geo)/2])
         else:
-            print "right"
-            return self.binary_search_tree_searching_for_geoidbp(ip,geo[len(geo)/2,len(geo)])
+            #print "right"
+            print geo[len(geo)/2][0],'<', ip
+            return self.geo_search(ip,geo[len(geo)/2:len(geo)])
         
-
+    def ip_conv(self, extIP):
+        first = extIP & 4278190080
+        first = first >> 24
+        first = str(first)
+        second = extIP & 16711680
+        second = second >> 16
+        second = str(second)
+        third = extIP & 65280
+        third = third >> 8
+        third = str(third)
+        fourth = extIP & 255
+        fourth = str(fourth)
+        result = first + '.' + second + '.' + third + '.' + fourth
+        print result 
+        print extIP
+        return result
 
     # TODO: You can add more methods as you want.
-
 # TODO: You may want to add more classes/functions as well.
