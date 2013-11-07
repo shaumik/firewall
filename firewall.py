@@ -14,8 +14,9 @@ class Firewall:
 
         # TODO: Load the firewall rules (from rule_filename) here.
         print 'I am supposed to load rules from %s, but I am feeling lazy.'
+        ####Loading rules into array
         self.rules = {}
-        rule_file = open("rules.conf")
+        rule_file = open(config['rule'])
         rline = rule_file.readline()
         while rline != "":
             parsed = rline.split()
@@ -26,8 +27,12 @@ class Firewall:
                     self.rules[parsed[1]].append(parsed)
             rline = rule_file.readline()
         rule_file.close()
+        #########finished loading rules
+
         # TODO: Load the GeoIP DB ('geoipdb.txt') as well.
         # TODO: Also do some initialization if needed.
+
+        #####loading geo into array
         geo_file = open("geoipdb.txt")
         line = geo_file.readline()
         self.geoipdb = []
@@ -35,10 +40,8 @@ class Firewall:
             self.geoipdb.append(line.split())
             line = geo_file.readline()
         geo_file.close()
+        #####finished loading geo
         
-        
-    def geoipdb(self):
-        return self.geoipdb
 
     def handle_timer(self):
         # TODO: For the timer feature, refer to bypass.py
