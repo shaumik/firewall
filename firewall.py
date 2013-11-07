@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from main import PKT_DIR_INCOMING, PKT_DIR_OUTGOING
+import struct
 
 # TODO: Feel free to import any Python standard moduless as necessary.
 # (http://docs.python.org/2/library/)
@@ -16,9 +17,12 @@ class Firewall:
         print 'I am supposed to load rules from %s, but I am feeling lazy.'
         ####Loading rules into array
         self.rules = {}
+        #print config['rule']
         rule_file = open(config['rule'])
+        #rule_file = open("rules.conf")
         rline = rule_file.readline()
         while rline != "":
+            rline = rline.lower()
             parsed = rline.split()
             if(len(parsed) != 0):
                 if parsed[0] != "%":
@@ -37,6 +41,7 @@ class Firewall:
         line = geo_file.readline()
         self.geoipdb = []
         while line != "":
+            line = line.lower()
             self.geoipdb.append(line.split())
             line = geo_file.readline()
         geo_file.close()
@@ -50,10 +55,118 @@ class Firewall:
     # @pkt_dir: either PKT_DIR_INCOMING or PKT_DIR_OUTGOING
     # @pkt: the actual data of the IPv4 packet (including IP header)
     def handle_packet(self, pkt_dir, pkt):
-        # TODO: Your main firewall code will be here.
-        pass
+        drop = False
+        #print pkt_dir
+        #print len(pkt[0:4])
+        #print "%d"%(pkt[0:4])
+        print pkt
+
+        l = struct.unpack('!H', pkt[2:4])
+        if len(pkt) != l[0]:
+            return
+
+        hlen = struct.unpack('!B', pkt[0:1])
+        hlen = int(hlen[0]) & 15
+        if hlen < 5:
+            return
+        hlen = hlen*4
+
+        protocol = struct.unpack('!B', pkt[9:10])
+        protocol = int(protocol[0])
+        print protocol
+
+        if pkt_dir == PKT_DIR_INCOMING:
+            source = struct.unpack('!L', pkt[12:16])
+            source = source[0]
+            if protocol == 17 or protocol == 6:
+                srcport = struct.unpack('!H', pkt[hlen:hlen+2])
+                srcport = srcport[0]
+            if protocol == 1:
+                print "ICMP"
+            elif protocol == 6:
+                print "TCP"
+            elif protocol == 17:
+                print "UDP"
+                drop = self.handle_UDP(source, srcport)
+            print drop
+            if drop == False:
+                self.iface_int.send_ip_packet(pkt)
+                print "incoming, send"
+
+        else:
+            dest = struct.unpack('!L', pkt[16:20])
+            dest = dest[0]
+        
+            if protocol == 17 or protocol == 6:
+                destport = struct.unpack('!H', pkt[hlen+2:hlen+4])
+                destport = destport[0]
+
+                if protocol == 1:
+                    print "ICMP"
+                elif protocol == 6:
+                    print "TCP"
+                elif protocol == 17:
+                    print "UDP"
+                    drop = self.handle_UDP(dest, destport)
+                print drop
+
+            if drop == False:
+                self.iface_ext.send_ip_packet(pkt)
+                print "outgoing, send"
+        
+
+    def handle_UDP(self, extIP, port):
+        drop = False
+        for rule in self.rules["udp"]:
+            print rule
+            ccn = self.binary_search_tree_searching_for_geoidbp(extIP, self.geoipdb)
+            print ccn
+            if rule[2] == extIP or rule[2] == 'any':
+                if rule[0] == 'drop': 
+                    drop = True
+                    print "gonna drop 1"
+                else:
+                    drop = False
+            if rule[3] == port or rule[2] == 'any':
+                if rule[0] == 'drop': 
+                    drop = True
+                    print "gonna drop 2"
+                else:
+                    drop = False
+        #print drop
+        return drop
+        
+    def handle_TCP(self, extIP, port):
+        drop = False
+        for rule in self.rules["tcp"]:
+            print rule
+            if rule[2] == extIP or rule[2] == 'any':
+                if rule[0] == 'drop': 
+                    drop = True
+                    print "gonna drop 1"
+                else:
+                    drop = False
+            if rule[3] == port or rule[2] == 'any':
+                if rule[0] == 'drop': 
+                    drop = True
+                    print "gonna drop 2"
+                else:
+                    drop = False
+        print drop
     
-    
+    def binary_search_tree_searching_for_geoidbp(self, ip, geo):
+        print ip
+        if(geo[len(geo)/2][0] <= ip and geo[len(geo)/2][1] >= ip):
+            return geo[len(geo)][2]
+        elif geo[len(geo)/2][0] > ip:
+            print "left"
+            return self.binary_search_tree_searching_for_geoidbp(ip,geo[0:len(geo)/2])
+        else:
+            print "right"
+            return self.binary_search_tree_searching_for_geoidbp(ip,geo[len(geo)/2,len(geo)])
+        
+
+
     # TODO: You can add more methods as you want.
 
 # TODO: You may want to add more classes/functions as well.
