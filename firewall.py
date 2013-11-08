@@ -157,7 +157,14 @@ class Firewall:
                 else:
                     drop = False
         #print drop
-    
+    def greater_than(ip1,ip2):
+        split_ip1 = ip1.split('.')
+        split_ip2 = ip2.split('.')
+        for i in range(length(split_ip1)):
+            if(int(split_ip1[i]) < int(split_ip2[i])):
+                return True
+        return False
+
     def geo_search(self, ip, geo):
        # print ip
         if len(geo) <= 1:
