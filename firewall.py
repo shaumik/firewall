@@ -166,14 +166,20 @@ class Firewall:
         ch = struct.unpack('!B', pkt[h2len+12:h2len+12+1])[0]
         x = pkt[h2len+12:]
         i = 1
+        #print pkt[h2len+12:h2len+12+1]
         while ch != 0:
             print "ch", ch
-            if not(ch == 3 and i == 1) :
-                if(ch == 3 or ch == 6):
-                    Qname += '.'
-                else:
-                    Qname += chr(ch)
+            #print "Qname", Qname
+            for k in range(ch):
+                
+                Qname += chr(struct.unpack('!B', pkt[h2len+12+i+k:h2len+12+1+i+k])[0])
+                print 'k', k
+                print "Qname", Qname
+                #i += 1
+            i += ch
             ch = struct.unpack('!B', pkt[h2len+12+i:h2len+12+1+i])[0]
+            if ch != 0:
+                Qname += '.'
             i += 1
         print "Qname:", Qname
         split_domain = Qname.split('.')
