@@ -123,7 +123,7 @@ class Firewall:
                         drop = self.handle_DNS(h2len, pkt)
                     else:
                         drop = self.handle_UDP(dest, destport)
-                print drop
+                print "drop or no?", drop
 
             if drop == False:
                 self.iface_ext.send_ip_packet(pkt)
@@ -148,6 +148,7 @@ class Firewall:
         return sz
 
     def handle_DNS(self, h2len, pkt):
+        done = False
         QDCount = struct.unpack('!H', pkt[h2len+4:h2len+6])
         QDCount = int(QDCount[0])
         if QDCount != 1:
@@ -185,14 +186,17 @@ class Firewall:
         split_domain = Qname.split('.')
         domain = split_domain[-2] + '.' + split_domain[-1]
         print "domain after split", domain
-
         #domain = self.decoder(Qname)
         #print "Domain:", self.decoder(Qname)
-
         for rule in self.rules["dns"]:
-            if rule[2] == domain and rule[0] == "drop":
+            if (Qname == rule[2] or rule[2] == domain) and rule[0] == "drop":
                 print "drop time"
-                return True
+                # DO WE WANT TO RETURN TRUE HERE? OR WAIT UNTIL THE LAST FUCKING RULE? NEED TO CHECK ALL RULES??
+                done = True
+            elif (Qname == rule[2] or rule[2] == domain) and rule[0] == "pass":
+                done = False
+        print "i guess dont drop", done
+        return done
 
     def handle_UDP(self, extIP, port):
         drop = False
