@@ -84,14 +84,14 @@ class Firewall:
                 srcport = srcport[0]
             if protocol == 1:
                 print "ICMP"
-                drop = self.handle_ICMP(source, srcport)
+                typez = struct.unpack('!B', pkt[hlen:hlen+1])
+                drop = self.handle_ICMP(source, typez)
             elif protocol == 6:
                 #print "TCP"
                 drop = self.handle_TCP(source, srcport)
             elif protocol == 17:
                 print "UDP"
                 drop = self.handle_UDP(source, srcport)
-            print drop
             if drop == False:
                 self.iface_int.send_ip_packet(pkt)
                 #print "incoming, send"
@@ -106,9 +106,10 @@ class Firewall:
 
                 if protocol == 1:
                     print "ICMP"
-                    drop = self.handle_ICMP(dest, destport)
+                    typez = struct.unpack('!B', pkt[hlen:hlen+1])
+                    drop = self.handle_ICMP(dest, typez)
                 elif protocol == 6:
-                    print "TCP"
+                    # print "TCP"
                     drop = self.handle_TCP(dest, destport)
                 elif protocol == 17:
                     print "UDP"
@@ -120,12 +121,15 @@ class Firewall:
                     h2len = hlen + 8
                     if destport == 53:
                         print "DNS FOR LIFE"
-                        drop = self.handle_DNS(h2len, pkt)
+                        drop = self.handle_DNS(h2len, pkt, dest, destport)
+                        print "drop or no?", drop
                     else:
                         drop = self.handle_UDP(dest, destport)
-                print "drop or no?", drop
+                        print "this is udp"
+                        print "drop or no?", drop
 
             if drop == False:
+                #print "drop is False so I'm sending!!!!"
                 self.iface_ext.send_ip_packet(pkt)
                 #print "outgoing, send"
         
@@ -147,20 +151,20 @@ class Firewall:
                 break
         return sz
 
-    def handle_DNS(self, h2len, pkt):
+    def handle_DNS(self, h2len, pkt, extIP, port):
         done = False
         QDCount = struct.unpack('!H', pkt[h2len+4:h2len+6])
         QDCount = int(QDCount[0])
         if QDCount != 1:
-            return True
+            return self.handle_UDP(extIP, port)
         Qtype = struct.unpack('!H', pkt[-4:-2])[0]
         if Qtype != 1 and Qtype != 28:
             print "not A and not AAAA", Qtype
-            return True
+            return self.handle_UDP(extIP, port)
         Qclass = struct.unpack('!H', pkt[-2:])[0]
         if Qclass != 1:
             print "not internet"
-            return True
+            return self.handle_UDP(extIP, port)
         
         print "inside handle DNS"
         Qname = ""
@@ -188,13 +192,39 @@ class Firewall:
         print "domain after split", domain
         #domain = self.decoder(Qname)
         #print "Domain:", self.decoder(Qname)
+        split_domain.reverse()
+        if 'www' in split_domain:
+            split_domain.remove('www')
         for rule in self.rules["dns"]:
-            if (Qname == rule[2] or rule[2] == domain) and rule[0] == "drop":
-                print "drop time"
-                # DO WE WANT TO RETURN TRUE HERE? OR WAIT UNTIL THE LAST FUCKING RULE? NEED TO CHECK ALL RULES??
-                done = True
-            elif (Qname == rule[2] or rule[2] == domain) and rule[0] == "pass":
-                done = False
+            print "rule", rule
+            dns_list = rule[2].split('.')
+            dns_list.reverse()
+            print "dns_list is rule", dns_list
+            print "test", split_domain
+            k = 0
+            match = True
+            if len(dns_list) != len(split_domain) and dns_list[-1] != '*':
+                match = False
+                print "lengths are different and no wildcard", match
+                continue
+            else:
+                while k < min(len(dns_list), len(split_domain)):
+                    if dns_list[k] == '*':
+                        print "wild card"
+                        match = True
+                        break
+                    if dns_list[k] != split_domain[k]:
+                        print "mismatch"
+                        match = False
+                        break
+                    k += 1
+            if match == True:                
+                if rule[0] == "drop":
+                    print "drop time"
+                    done = True
+                elif rule[0] == "pass":
+                    print "pass time"
+                    done = False
         print "i guess dont drop", done
         return done
 
