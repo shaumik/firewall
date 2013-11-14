@@ -62,6 +62,7 @@ class Firewall:
         #print pkt
 
         l = struct.unpack('!H', pkt[2:4])
+        # Check total length of packet equals total length of packet
         if len(pkt) != l[0]:
             return
 
@@ -157,14 +158,6 @@ class Firewall:
         QDCount = int(QDCount[0])
         if QDCount != 1:
             return self.handle_UDP(extIP, port)
-        Qtype = struct.unpack('!H', pkt[-4:-2])[0]
-        if Qtype != 1 and Qtype != 28:
-            print "not A and not AAAA", Qtype
-            return self.handle_UDP(extIP, port)
-        Qclass = struct.unpack('!H', pkt[-2:])[0]
-        if Qclass != 1:
-            print "not internet"
-            return self.handle_UDP(extIP, port)
         
         print "inside handle DNS"
         Qname = ""
@@ -190,11 +183,23 @@ class Firewall:
         split_domain = Qname.split('.')
         domain = split_domain[-2] + '.' + split_domain[-1]
         print "domain after split", domain
+
+        Qtype = struct.unpack('!H', pkt[h2len+12+i:h2len+12+i+2])[0]
+        if Qtype != 1 and Qtype != 28:
+            print "not A and not AAAA", Qtype
+            return self.handle_UDP(extIP, port)
+        Qclass = struct.unpack('!H', pkt[h2len+12+i+2:h2len+12+i+2+2])[0]
+        if Qclass != 1:
+            print "not internet"
+            return self.handle_UDP(extIP, port)
+
         #domain = self.decoder(Qname)
         #print "Domain:", self.decoder(Qname)
-        split_domain.reverse()
         if 'www' in split_domain:
             split_domain.remove('www')
+        split_domain.reverse()
+        if "dns" not in self.rules:
+            return done
         for rule in self.rules["dns"]:
             print "rule", rule
             dns_list = rule[2].split('.')
@@ -230,6 +235,8 @@ class Firewall:
 
     def handle_UDP(self, extIP, port):
         drop = False
+        if "udp" not in self.rules:
+            return drop
         for rule in self.rules["udp"]:
             #print rule
             IP = self.ip_conv(extIP)
@@ -252,6 +259,8 @@ class Firewall:
         
     def handle_TCP(self, extIP, port):
         drop = False
+        if "tcp" not in self.rules:
+            return drop
         for rule in self.rules["tcp"]:
             #print rule
             IP = self.ip_conv(extIP)
@@ -274,6 +283,8 @@ class Firewall:
 
     def handle_ICMP(self, extIP, type):
         drop = False
+        if "icmp" not in self.rules:
+            return drop
         for rule in self.rules["icmp"]:
             #print rule
             IP = self.ip_conv(extIP)
