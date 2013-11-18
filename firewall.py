@@ -14,7 +14,7 @@ class Firewall:
         self.iface_ext = iface_ext
 
         # TODO: Load the firewall rules (from rule_filename) here.
-        print 'I am supposed to load rules from %s, but I am feeling lazy.'
+        #print 'I am supposed to load rules from %s, but I am feeling lazy.'
         ####Loading rules into array
         self.rules = {}
         #print config['rule']
@@ -60,8 +60,9 @@ class Firewall:
         #print len(pkt[0:4])
         #print "%d"%(pkt[0:4])
         #print pkt
-
         l = struct.unpack('!H', pkt[2:4])
+        if len(l) == 0:
+            return
         # Check total length of packet equals total length of packet
         if len(pkt) != l[0]:
             return
@@ -91,7 +92,7 @@ class Firewall:
                 #print "TCP"
                 drop = self.handle_TCP(source, srcport)
             elif protocol == 17:
-                print "UDP"
+                #print "UDP"
                 drop = self.handle_UDP(source, srcport)
             if drop == False:
                 self.iface_int.send_ip_packet(pkt)
@@ -106,14 +107,14 @@ class Firewall:
                 destport = destport[0]
 
                 if protocol == 1:
-                    print "ICMP"
+                    #print "ICMP"
                     typez = struct.unpack('!B', pkt[hlen:hlen+1])
                     drop = self.handle_ICMP(dest, typez)
                 elif protocol == 6:
                     # print "TCP"
                     drop = self.handle_TCP(dest, destport)
                 elif protocol == 17:
-                    print "UDP"
+                    #print "UDP"
                     #h2len = struct.unpack('!H', pkt[hlen+4:hlen+6])
                     #print hlen
                     #print h2len
@@ -121,13 +122,13 @@ class Firewall:
                     #print h2len
                     h2len = hlen + 8
                     if destport == 53:
-                        print "DNS FOR LIFE"
+                        #print "DNS FOR LIFE"
                         drop = self.handle_DNS(h2len, pkt, dest, destport)
-                        print "drop or no?", drop
+                        #print "drop or no?", drop
                     else:
                         drop = self.handle_UDP(dest, destport)
-                        print "this is udp"
-                        print "drop or no?", drop
+                        #print "this is udp"
+                        #print "drop or no?", drop
 
             if drop == False:
                 #print "drop is False so I'm sending!!!!"
@@ -159,149 +160,144 @@ class Firewall:
         if QDCount != 1:
             return self.handle_UDP(extIP, port)
         
-        print "inside handle DNS"
+        #print "inside handle DNS"
         Qname = ""
         ch = struct.unpack('!B', pkt[h2len+12:h2len+12+1])[0]
         x = pkt[h2len+12:]
         i = 1
         #print pkt[h2len+12:h2len+12+1]
         while ch != 0:
-            print "ch", ch
+            #print "ch", ch
             #print "Qname", Qname
             for k in range(ch):
                 
                 Qname += chr(struct.unpack('!B', pkt[h2len+12+i+k:h2len+12+1+i+k])[0])
-                print 'k', k
-                print "Qname", Qname
+                #print 'k', k
+                #print "Qname", Qname
                 #i += 1
             i += ch
             ch = struct.unpack('!B', pkt[h2len+12+i:h2len+12+1+i])[0]
             if ch != 0:
                 Qname += '.'
             i += 1
-        print "Qname:", Qname
+        #print "Qname:", Qname
         split_domain = Qname.split('.')
-        domain = split_domain[-2] + '.' + split_domain[-1]
-        print "domain after split", domain
+        #domain = split_domain[-2] + '.' + split_domain[-1]
+        #print "domain after split", domain
 
         Qtype = struct.unpack('!H', pkt[h2len+12+i:h2len+12+i+2])[0]
         if Qtype != 1 and Qtype != 28:
-            print "not A and not AAAA", Qtype
+            #print "not A and not AAAA", Qtype
             return self.handle_UDP(extIP, port)
         Qclass = struct.unpack('!H', pkt[h2len+12+i+2:h2len+12+i+2+2])[0]
         if Qclass != 1:
-            print "not internet"
+            #print "not internet"
             return self.handle_UDP(extIP, port)
 
         #domain = self.decoder(Qname)
         #print "Domain:", self.decoder(Qname)
-        if 'www' in split_domain:
-            split_domain.remove('www')
+        #if 'www' in split_domain:
+            #split_domain.remove('www')
         split_domain.reverse()
         if "dns" not in self.rules:
             return done
         for rule in self.rules["dns"]:
-            print "rule", rule
+            #print "rule", rule
             dns_list = rule[2].split('.')
             dns_list.reverse()
-            print "dns_list is rule", dns_list
-            print "test", split_domain
+            #print "dns_list is rule", dns_list
+            #print "test", split_domain
             k = 0
             match = True
             if len(dns_list) != len(split_domain) and dns_list[-1] != '*':
                 match = False
-                print "lengths are different and no wildcard", match
+                #print "lengths are different and no wildcard", match
                 continue
             else:
                 while k < min(len(dns_list), len(split_domain)):
                     if dns_list[k] == '*':
-                        print "wild card"
+                        #print "wild card"
                         match = True
                         break
                     if dns_list[k] != split_domain[k]:
-                        print "mismatch"
+                        #print "mismatch"
                         match = False
                         break
                     k += 1
             if match == True:                
                 if rule[0] == "drop":
-                    print "drop time"
+                    #print "drop time"
                     done = True
                 elif rule[0] == "pass":
-                    print "pass time"
+                    #print "pass time"
                     done = False
-        print "i guess dont drop", done
+        #print "i guess dont drop", done
         return done
 
     def handle_UDP(self, extIP, port):
         drop = False
+        #print "upd handle"
         if "udp" not in self.rules:
             return drop
         for rule in self.rules["udp"]:
             #print rule
             IP = self.ip_conv(extIP)
             ccn = self.geo_search(IP, self.geoipdb)
-           # print ccn
+            #print ccn
             if rule[2] == IP or rule[2] == 'any' or rule[2] == ccn:
-                if rule[0] == 'drop': 
-                    drop = True
-                    #print "gonna drop 1"
-                else:
-                    drop = False
-            if rule[3] == port or rule[2] == 'any':
-                if rule[0] == 'drop': 
-                    drop = True
+                if rule[3] == 'any' or int(rule[3]) == port:
+                    if rule[0] == 'drop':
+                        drop = True
+                    	#print "gonna drop 1"
+                    else:
+                        drop = False
+            #if rule[3] == port or rule[2] == 'any':
+                #if rule[0] == 'drop': 
+                    #drop = True
                     #print "gonna drop 2"
-                else:
-                    drop = False
+                #else:
+                   # drop = False
         #print drop
         return drop
         
     def handle_TCP(self, extIP, port):
         drop = False
+        #print "tcp handle"
         if "tcp" not in self.rules:
             return drop
         for rule in self.rules["tcp"]:
             #print rule
             IP = self.ip_conv(extIP)
             ccn = self.geo_search(IP, self.geoipdb)
-           # print ccn
+            #print ccn
             if rule[2] == IP or rule[2] == 'any' or rule[2] == ccn:
-                if rule[0] == 'drop': 
-                    drop = True
-                    #print "gonna drop 1"
-                else:
-                    drop = False
-            if rule[3] == port or rule[2] == 'any':
-                if rule[0] == 'drop': 
-                    drop = True
-                    #print "gonna drop 2"
-                else:
-                    drop = False
+                #print "contry match"
+                #print "port", port, type(port), "rule3", rule[3], type(rule[3])
+                if rule[3] == 'any' or int(rule[3]) == port:
+                    #print "match.com port"
+                    if rule[0] == 'drop':
+                        drop = True
+                    else:
+                        drop = False
         #print drop
         return drop
 
     def handle_ICMP(self, extIP, type):
         drop = False
+        #print "icmp handle"
         if "icmp" not in self.rules:
             return drop
         for rule in self.rules["icmp"]:
             #print rule
             IP = self.ip_conv(extIP)
             ccn = self.geo_search(IP, self.geoipdb)
-           # print ccn
+            #print ccn
             if rule[2] == IP or rule[2] == 'any' or rule[2] == ccn:
-                if rule[0] == 'drop': 
-                    drop = True
-                    print "gonna drop 1"
-                else:
-                    drop = False
-            if rule[3] == type or rule[2] == 'any':
-                if rule[0] == 'drop': 
-                    drop = True
-                    print "gonna drop 2"
-                else:
-                    drop = False
+                if rule[3] == 'any' or int(rule[3]) == type:
+                    if rule[0] == 'drop':
+                        drop = True
+                    else:
+                        drop = False
         #print drop
         return drop
 
